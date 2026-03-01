@@ -85,6 +85,14 @@ export default function PanoramaViewer({
     lastCenterY: number
   }>({ active: false, initialDist: 0, initialFov: 75, lastCenterX: 0, lastCenterY: 0 })
   
+  // Smooth FOV target for wheel zoom
+  const targetFovRef = useRef(fov)
+
+  // Update targetFov when prop changes
+  useEffect(() => {
+    targetFovRef.current = fov
+  }, [fov])
+
   // Reusable raycaster for performance
   const raycasterRef = useRef(new THREE.Raycaster())
   const mouseVecRef = useRef(new THREE.Vector2())
@@ -195,10 +203,22 @@ export default function PanoramaViewer({
         targetRotationRef.current.yaw += autoRotateSpeed * dt * 10
       }
 
+      // Apply momentum when not dragging
+      if (pointerState.current.mode === 'none' && !autoRotate) {
+        const friction = Math.exp(-dt * 4) // smooth exponential decay
+        velocityRef.current.yaw *= friction
+        velocityRef.current.pitch *= friction
+        // Kill tiny residual movement
+        if (Math.abs(velocityRef.current.yaw) < 0.001) velocityRef.current.yaw = 0
+        if (Math.abs(velocityRef.current.pitch) < 0.001) velocityRef.current.pitch = 0
+        targetRotationRef.current.yaw += velocityRef.current.yaw * dt * 60
+        targetRotationRef.current.pitch += velocityRef.current.pitch * dt * 60
+      }
+
       // Smooth camera interpolation - freeze during hotspot drag for stable raycast
       if (pointerState.current.mode !== 'hotspot') {
-        // Smooth interpolation -- lower factor = more smoothing, less overshoot
-        const smoothFactor = 1 - Math.exp(-dt * 18)
+        // Smooth interpolation -- lower factor = more smoothing, silky feel
+        const smoothFactor = 1 - Math.exp(-dt * 12)
         rotationRef.current.yaw += (targetRotationRef.current.yaw - rotationRef.current.yaw) * smoothFactor
         rotationRef.current.pitch += (targetRotationRef.current.pitch - rotationRef.current.pitch) * smoothFactor
       } else {
@@ -212,6 +232,14 @@ export default function PanoramaViewer({
       const yr = THREE.MathUtils.degToRad(rotationRef.current.yaw)
       const pr = THREE.MathUtils.degToRad(rotationRef.current.pitch)
       camera.lookAt(Math.cos(pr) * Math.sin(yr) * 100, Math.sin(pr) * 100, Math.cos(pr) * Math.cos(yr) * 100)
+
+      // Smooth FOV interpolation for silky zoom
+      const fovDiff = targetFovRef.current - camera.fov
+      if (Math.abs(fovDiff) > 0.01) {
+        camera.fov += fovDiff * (1 - Math.exp(-dt * 10))
+        camera.updateProjectionMatrix()
+      }
+
       renderer.render(ts, camera)
 
       // Position hotspot elements directly in DOM - optimized for 60fps
@@ -454,8 +482,8 @@ export default function PanoramaViewer({
       // Scale sensitivity based on FOV
       const cam = cameraRef.current
       const fovScale = cam ? cam.fov / 75 : 1
-      // Lower base sensitivity for more controlled, precise movement
-      const sensitivity = 0.2 * fovScale
+      // Balanced sensitivity for smooth, responsive movement
+      const sensitivity = 0.25 * fovScale
 
       const deltaYaw = moveDx * sensitivity
       const deltaPitch = moveDy * sensitivity
@@ -467,7 +495,7 @@ export default function PanoramaViewer({
       // This prevents a single large delta from causing extreme momentum
       const velocityYaw = (deltaYaw / timeDelta) * 16 // normalize to ~60fps
       const velocityPitch = (deltaPitch / timeDelta) * 16
-      const alpha = 0.3 // smoothing factor
+      const alpha = 0.25 // smoothing factor -- lower = smoother momentum
       smoothVelRef.current.yaw = smoothVelRef.current.yaw * (1 - alpha) + velocityYaw * alpha
       smoothVelRef.current.pitch = smoothVelRef.current.pitch * (1 - alpha) + velocityPitch * alpha
     }
@@ -519,8 +547,12 @@ export default function PanoramaViewer({
     }
 
     if (ps.mode === 'camera') {
-      // Stop camera immediately on release -- no momentum/drift
-      velocityRef.current = { yaw: 0, pitch: 0 }
+      // Transfer smoothed velocity for momentum/inertia after release
+      const maxMomentum = 3.0 // cap maximum momentum
+      velocityRef.current = {
+        yaw: Math.max(-maxMomentum, Math.min(maxMomentum, smoothVelRef.current.yaw)),
+        pitch: Math.max(-maxMomentum, Math.min(maxMomentum, smoothVelRef.current.pitch)),
+      }
       smoothVelRef.current = { yaw: 0, pitch: 0 }
 
       if (!ps.moved) {
@@ -559,8 +591,8 @@ export default function PanoramaViewer({
     e.preventDefault()
     const camera = cameraRef.current
     if (!camera) return
-    camera.fov = Math.max(30, Math.min(100, camera.fov + e.deltaY * 0.05))
-    camera.updateProjectionMatrix()
+    // Update target FOV -- the animation loop will smoothly interpolate
+    targetFovRef.current = Math.max(30, Math.min(100, targetFovRef.current + e.deltaY * 0.05))
   }, [])
 
   // ---- Drag & drop ----
