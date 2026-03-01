@@ -54,7 +54,7 @@ export default function PanoramaViewer({
   // Momentum / inertia for smooth touch feel
   const velocityRef = useRef({ yaw: 0, pitch: 0 })
 
-  // Pointer tracking
+  // Pointer tracking -- keyed by pointerId to properly handle multi-touch
   const pointerState = useRef<{
     mode: 'none' | 'camera' | 'hotspot'
     startX: number
@@ -68,13 +68,19 @@ export default function PanoramaViewer({
     pointerId: number
   }>({ mode: 'none', startX: 0, startY: 0, lastX: 0, lastY: 0, moved: false, hotspotId: null, hotspotStartYaw: 0, hotspotStartPitch: 0, pointerId: -1 })
 
+  // Track ALL active pointers for multi-touch handling
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map())
+
   // Multi-touch pinch zoom tracking
   const pinchState = useRef<{
     active: boolean
     initialDist: number
     initialFov: number
-    pointers: Map<number, { x: number; y: number }>
-  }>({ active: false, initialDist: 0, initialFov: 75, pointers: new Map() })
+    initialYaw: number
+    initialPitch: number
+    lastCenterX: number
+    lastCenterY: number
+  }>({ active: false, initialDist: 0, initialFov: 75, initialYaw: 0, initialPitch: 0, lastCenterX: 0, lastCenterY: 0 })
   
   // Reusable raycaster for performance
   const raycasterRef = useRef(new THREE.Raycaster())
@@ -246,6 +252,20 @@ export default function PanoramaViewer({
     return () => cancelAnimationFrame(frameIdRef.current)
   }, [autoRotate, autoRotateSpeed, selectedHotspotId])
 
+  // ---- Prevent native touch scrolling / pull-to-refresh on the viewer ----
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const preventTouch = (e: TouchEvent) => { e.preventDefault() }
+    // Must use { passive: false } to allow preventDefault on touchmove
+    el.addEventListener('touchmove', preventTouch, { passive: false })
+    el.addEventListener('touchstart', preventTouch, { passive: false })
+    return () => {
+      el.removeEventListener('touchmove', preventTouch)
+      el.removeEventListener('touchstart', preventTouch)
+    }
+  }, [])
+
   // ---- Resize ----
   useEffect(() => {
     const container = canvasContainerRef.current
@@ -287,11 +307,14 @@ export default function PanoramaViewer({
 
   // ---- Unified pointer handling on the container ----
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    // Track every pointer for multi-touch
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
     // Check if a hotspot element was the target
     const target = e.target as HTMLElement
     const hotspotEl = target.closest('[data-hotspot-id]') as HTMLElement | null
 
-    if (hotspotEl && onHotspotMoved) {
+    if (hotspotEl && onHotspotMoved && activePointersRef.current.size === 1) {
       const hsId = hotspotEl.getAttribute('data-hotspot-id')!
       const hs = sceneRef.current.hotspots.find((h) => h.id === hsId)
       if (hs) {
@@ -312,59 +335,90 @@ export default function PanoramaViewer({
       }
     }
 
-    // Camera drag -- reset velocity for fresh drag
-    velocityRef.current = { yaw: 0, pitch: 0 }
-
-    // Track pointer for pinch zoom
-    pinchState.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-
-    // If two fingers are down, start pinch mode
-    if (pinchState.current.pointers.size === 2) {
-      const pts = Array.from(pinchState.current.pointers.values())
+    // If this is a second finger and we were in camera mode, switch to pinch
+    if (activePointersRef.current.size === 2) {
+      const pts = Array.from(activePointersRef.current.values())
       const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
-      pinchState.current.active = true
-      pinchState.current.initialDist = dist
-      pinchState.current.initialFov = cameraRef.current?.fov || 75
+      const centerX = (pts[0].x + pts[1].x) / 2
+      const centerY = (pts[0].y + pts[1].y) / 2
+      pinchState.current = {
+        active: true,
+        initialDist: dist,
+        initialFov: cameraRef.current?.fov || 75,
+        initialYaw: targetRotationRef.current.yaw,
+        initialPitch: targetRotationRef.current.pitch,
+        lastCenterX: centerX,
+        lastCenterY: centerY,
+      }
+      // Stop momentum during pinch
+      velocityRef.current = { yaw: 0, pitch: 0 }
+      // Don't start new camera drag for the second finger
+      return
     }
 
-    pointerState.current = {
-      mode: 'camera',
-      startX: e.clientX, startY: e.clientY,
-      lastX: e.clientX, lastY: e.clientY,
-      moved: false,
-      hotspotId: null,
-      hotspotStartYaw: 0, hotspotStartPitch: 0,
-      pointerId: e.pointerId,
+    // Camera drag -- only start if this is the first/only finger
+    if (activePointersRef.current.size === 1) {
+      velocityRef.current = { yaw: 0, pitch: 0 }
+      pointerState.current = {
+        mode: 'camera',
+        startX: e.clientX, startY: e.clientY,
+        lastX: e.clientX, lastY: e.clientY,
+        moved: false,
+        hotspotId: null,
+        hotspotStartYaw: 0, hotspotStartPitch: 0,
+        pointerId: e.pointerId,
+      }
+      containerRef.current?.setPointerCapture(e.pointerId)
     }
-    containerRef.current?.setPointerCapture(e.pointerId)
   }, [onHotspotMoved])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    const ps = pointerState.current
-    if (ps.mode === 'none') return
-
-    // Update pinch pointer position
-    if (pinchState.current.pointers.has(e.pointerId)) {
-      pinchState.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    // Always update tracked pointer position
+    if (activePointersRef.current.has(e.pointerId)) {
+      activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     }
 
-    // Handle pinch zoom with two fingers
-    if (pinchState.current.active && pinchState.current.pointers.size === 2) {
-      const pts = Array.from(pinchState.current.pointers.values())
+    const ps = pointerState.current
+
+    // Handle pinch zoom + pan with two fingers
+    if (pinchState.current.active && activePointersRef.current.size === 2) {
+      const pts = Array.from(activePointersRef.current.values())
       const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
+      const centerX = (pts[0].x + pts[1].x) / 2
+      const centerY = (pts[0].y + pts[1].y) / 2
+
+      // Pinch zoom
       const scale = pinchState.current.initialDist / dist
       const camera = cameraRef.current
       if (camera) {
         camera.fov = Math.max(30, Math.min(100, pinchState.current.initialFov * scale))
         camera.updateProjectionMatrix()
       }
-      return // Don't process camera drag during pinch
+
+      // Two-finger pan: move camera based on center point movement
+      const panDx = centerX - pinchState.current.lastCenterX
+      const panDy = centerY - pinchState.current.lastCenterY
+      const cam = cameraRef.current
+      const fovScale = cam ? cam.fov / 75 : 1
+      const panSensitivity = 0.2 * fovScale
+      targetRotationRef.current.yaw += panDx * panSensitivity
+      targetRotationRef.current.pitch += panDy * panSensitivity
+
+      pinchState.current.lastCenterX = centerX
+      pinchState.current.lastCenterY = centerY
+      return // Don't process single-finger camera drag during pinch
     }
+
+    if (ps.mode === 'none') return
+
+    // Ignore move events from pointers that are not the primary drag pointer
+    if (e.pointerId !== ps.pointerId) return
 
     const dx = e.clientX - ps.startX
     const dy = e.clientY - ps.startY
-    // Very low threshold for instant drag detection
-    if (!ps.moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) ps.moved = true
+    // Use slightly higher threshold on touch for better tap detection
+    const threshold = e.pointerType === 'touch' ? 6 : 2
+    if (!ps.moved && (Math.abs(dx) > threshold || Math.abs(dy) > threshold)) ps.moved = true
 
     if (ps.mode === 'hotspot' && ps.moved && onHotspotMoved && ps.hotspotId) {
       // Delta-based movement: move hotspot relative to mouse movement
@@ -401,7 +455,9 @@ export default function PanoramaViewer({
       // Scale sensitivity based on FOV for consistent feel at all zoom levels
       const cam = cameraRef.current
       const fovScale = cam ? cam.fov / 75 : 1
-      const sensitivity = 0.3 * fovScale
+      // Slightly higher sensitivity on touch for more responsive feel
+      const baseSens = e.pointerType === 'touch' ? 0.35 : 0.3
+      const sensitivity = baseSens * fovScale
 
       const deltaYaw = moveDx * sensitivity
       const deltaPitch = moveDy * sensitivity
@@ -417,13 +473,20 @@ export default function PanoramaViewer({
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     const ps = pointerState.current
-    containerRef.current?.releasePointerCapture(e.pointerId)
 
-    // Clean up pinch state
-    pinchState.current.pointers.delete(e.pointerId)
-    if (pinchState.current.pointers.size < 2) {
+    // Release pointer capture safely
+    try { containerRef.current?.releasePointerCapture(e.pointerId) } catch { /* already released */ }
+
+    // Remove from active pointers
+    activePointersRef.current.delete(e.pointerId)
+
+    // Clean up pinch state when fewer than 2 fingers
+    if (activePointersRef.current.size < 2) {
       pinchState.current.active = false
     }
+
+    // Only process up events for the pointer that started the interaction
+    if (e.pointerId !== ps.pointerId) return
 
     if (ps.mode === 'hotspot') {
       // No momentum for hotspot drags
@@ -435,7 +498,7 @@ export default function PanoramaViewer({
     }
 
     if (ps.mode === 'camera' && !ps.moved) {
-      // Click on panorama -- place hotspot or click hotspot
+      // Click/tap on panorama -- place hotspot or click hotspot
       const target = e.target as HTMLElement
       const hotspotEl = target.closest('[data-hotspot-id]') as HTMLElement | null
       if (hotspotEl && onHotspotClick && !onHotspotMoved) {
@@ -450,6 +513,18 @@ export default function PanoramaViewer({
 
     pointerState.current = { mode: 'none', startX: 0, startY: 0, lastX: 0, lastY: 0, moved: false, hotspotId: null, hotspotStartYaw: 0, hotspotStartPitch: 0, pointerId: -1 }
   }, [isEditorMode, onSceneClick, onHotspotClick, onHotspotMoved, screenToYawPitch])
+
+  // Handle pointer cancel (common on mobile when browser takes over gesture)
+  const handlePointerCancel = useCallback((e: React.PointerEvent) => {
+    try { containerRef.current?.releasePointerCapture(e.pointerId) } catch { /* already released */ }
+    activePointersRef.current.delete(e.pointerId)
+    if (activePointersRef.current.size < 2) {
+      pinchState.current.active = false
+    }
+    if (activePointersRef.current.size === 0) {
+      pointerState.current = { mode: 'none', startX: 0, startY: 0, lastX: 0, lastY: 0, moved: false, hotspotId: null, hotspotStartYaw: 0, hotspotStartPitch: 0, pointerId: -1 }
+    }
+  }, [])
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
@@ -486,13 +561,14 @@ export default function PanoramaViewer({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onWheel={handleWheel}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
       {/* Three.js canvas */}
-      <div ref={canvasContainerRef} className="absolute inset-0" />
+      <div ref={canvasContainerRef} className="absolute inset-0" style={{ touchAction: 'none' }} />
 
       {/* Hotspot overlays */}
       <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
