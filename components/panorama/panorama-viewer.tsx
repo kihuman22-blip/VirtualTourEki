@@ -232,7 +232,15 @@ export default function PanoramaViewer({
           const x = (tempVec.x * 0.5 + 0.5) * w
           const y = (-tempVec.y * 0.5 + 0.5) * h
           const depth = Math.max(0.5, Math.abs(tempVec.z))
-          const scale = Math.max(0.7, Math.min(1.1, 1.0 / depth))
+          const baseScale = Math.max(0.7, Math.min(1.1, 1.0 / depth))
+          // Gaze proximity: icons near center of screen get a subtle scale boost
+          const cx = w / 2, cy = h / 2
+          const distToCenter = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy))
+          const maxDist = Math.min(w, h) * 0.35
+          const proximity = Math.max(0, 1 - distToCenter / maxDist)
+          // Subtle boost: up to 15% larger when directly looked at
+          const gazeScale = 1 + proximity * 0.15
+          const scale = baseScale * gazeScale
           // Use transform for GPU-accelerated positioning
           el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`
           el.style.opacity = '1'
@@ -506,13 +514,13 @@ export default function PanoramaViewer({
               ref={(el) => setHotspotRef(hotspot.id, el)}
               data-hotspot-id={hotspot.id}
               className="absolute top-0 left-0 pointer-events-auto"
-              style={{ opacity: 0, willChange: 'transform', transition: 'opacity 0.15s ease-out' }}
+              style={{ opacity: 0, willChange: 'transform', transition: 'opacity 0.15s ease-out, transform 0.15s ease-out' }}
             >
               {hotspot.type === 'scene-link' ? (
                 <div className={`flex flex-col items-center ${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} group/arrow`}>
                   {/* Arrow icon with pin stem */}
                   <div
-                    className={`relative flex items-center justify-center rounded-full transition-all duration-200 group-hover/arrow:scale-110 ${isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-black/50' : ''}`}
+                    className={`relative flex items-center justify-center rounded-full transition-transform duration-200 ease-out group-hover/arrow:scale-[1.15] ${isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-black/50' : ''}`}
                     style={{
                       width: iconSize + 4, height: iconSize + 4,
                       background: hotspot.color || '#4db8a4',
@@ -536,7 +544,7 @@ export default function PanoramaViewer({
                 <div className={`flex flex-col items-center ${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} group/hs`}>
                   {/* Icon with pin stem - orange/amber style */}
                   <div
-                    className={`flex items-center justify-center rounded-full transition-all duration-200 group-hover/hs:scale-110 ${isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-black/50' : ''}`}
+                    className={`flex items-center justify-center rounded-full transition-transform duration-200 ease-out group-hover/hs:scale-[1.15] ${isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-black/50' : ''}`}
                     style={{
                       width: iconSize, height: iconSize,
                       background: hotspot.color || '#f59e0b',
