@@ -105,6 +105,7 @@ export default function PublicTourViewer({ tour, tourName }: PublicTourViewerPro
           fov={tour.settings?.defaultFov || 75}
           autoRotate={tour.settings?.autoRotate || false}
           autoRotateSpeed={tour.settings?.autoRotateSpeed || 0.5}
+          iconSize={tour.settings?.iconSize ?? 40}
           onHotspotClick={handleHotspotClick}
           isEditorMode={false}
           selectedHotspotId={null}
@@ -112,11 +113,11 @@ export default function PublicTourViewer({ tour, tourName }: PublicTourViewerPro
         />
 
         {/* Top bar */}
-        <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-background/70 to-transparent pointer-events-none">
-          <div className="flex items-center gap-2.5 pointer-events-auto">
-            <div className="flex items-center gap-2 bg-card/60 backdrop-blur-md border border-border/50 rounded-lg px-3 py-1.5">
-              <Compass className="h-3.5 w-3.5 text-primary" />
-              <span className="text-sm font-medium text-foreground">{tourName}</span>
+        <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 bg-gradient-to-b from-background/70 to-transparent pointer-events-none">
+          <div className="flex items-center gap-2 sm:gap-2.5 pointer-events-auto">
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-card/60 backdrop-blur-md border border-border/50 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5">
+              <Compass className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
+              <span className="text-xs sm:text-sm font-medium text-foreground truncate max-w-[30vw] sm:max-w-none">{tourName}</span>
             </div>
           </div>
           <div className="flex items-center gap-1.5 pointer-events-auto">

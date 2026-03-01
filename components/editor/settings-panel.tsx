@@ -112,6 +112,19 @@ export default function SettingsPanel() {
             />
             <span className="text-[10px] text-muted-foreground">{tour.settings.transitionDuration}ms</span>
           </div>
+
+          <div>
+            <Label className="text-xs text-muted-foreground">Icon Size</Label>
+            <Slider
+              value={[tour.settings.iconSize ?? 40]}
+              onValueChange={([val]) => updateTourSettings({ iconSize: val })}
+              min={24}
+              max={64}
+              step={2}
+              className="mt-2"
+            />
+            <span className="text-[10px] text-muted-foreground">{tour.settings.iconSize ?? 40}px</span>
+          </div>
         </div>
       </div>
     </ScrollArea>
