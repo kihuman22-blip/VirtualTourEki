@@ -276,8 +276,8 @@ function generateStandaloneHTML(tour: Tour): string {
     scene = new THREE.Scene();
     tempVec = new THREE.Vector3();
 
-    var segments = isMobile ? 64 : 128;
-    var rings = isMobile ? 40 : 80;
+    var segments = isMobile ? 96 : 200;
+    var rings = isMobile ? 64 : 128;
     var geometry = new THREE.SphereGeometry(500, segments, rings);
     geometry.scale(-1, 1, 1);
     var material = new THREE.MeshBasicMaterial();
@@ -285,7 +285,7 @@ function generateStandaloneHTML(tour: Tour): string {
     scene.add(sphere);
 
     renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.insertBefore(renderer.domElement, container.firstChild);
@@ -305,6 +305,8 @@ function generateStandaloneHTML(tour: Tour): string {
   var lastX = 0, lastY = 0;
   var velLon = 0, velLat = 0;
   var smoothVelLon = 0, smoothVelLat = 0;
+  var targetLon = 0, targetLat = 0;
+  var displayLon = 0, displayLat = 0;
   var pointers = {};
   var pinchActive = false, pinchInitDist = 0, pinchInitFov = 75;
 
@@ -360,13 +362,13 @@ function generateStandaloneHTML(tour: Tour): string {
     lastX = e.clientX;
     lastY = e.clientY;
 
-    var sens = 0.2 * (fov / 75);
-    lon -= dx * sens;
-    lat += dy * sens;
+    var sens = 0.18 * (fov / 75);
+    targetLon -= dx * sens;
+    targetLat += dy * sens;
 
     // Smooth velocity tracking for momentum
-    smoothVelLon = smoothVelLon * 0.7 + (dx * sens) * 0.3;
-    smoothVelLat = smoothVelLat * 0.7 + (dy * sens) * 0.3;
+    smoothVelLon = smoothVelLon * 0.85 + (dx * sens) * 0.15;
+    smoothVelLat = smoothVelLat * 0.85 + (dy * sens) * 0.15;
   }
   function onPointerUp(e) {
     delete pointers[e.pointerId];
@@ -385,15 +387,16 @@ function generateStandaloneHTML(tour: Tour): string {
       }
       isUserInteracting = false;
       dragPointerId = -1;
-      velLon = 0;
-      velLat = 0;
+      // Transfer smoothed velocity for gentle momentum
+      var maxM = 1.0;
+      velLon = Math.max(-maxM, Math.min(maxM, smoothVelLon));
+      velLat = Math.max(-maxM, Math.min(maxM, smoothVelLat));
+      smoothVelLon = 0; smoothVelLat = 0;
     }
   }
   function onWheel(e) {
     e.preventDefault();
-    fov = Math.max(30, Math.min(100, fov + e.deltaY * 0.05));
-    camera.fov = fov;
-    camera.updateProjectionMatrix();
+    targetFov = Math.max(30, Math.min(100, targetFov + e.deltaY * 0.05));
   }
   function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -413,6 +416,8 @@ function generateStandaloneHTML(tour: Tour): string {
     if (sceneData.initialViewDirection) {
       lon = sceneData.initialViewDirection.yaw || 0;
       lat = sceneData.initialViewDirection.pitch || 0;
+      targetLon = lon; targetLat = lat;
+      displayLon = lon; displayLat = lat;
     }
 
     // Load texture
@@ -620,13 +625,41 @@ function generateStandaloneHTML(tour: Tour): string {
   }
 
   var lastFrameTime = 0;
+  var targetFov = 75;
   function animate(now) {
     requestAnimationFrame(animate);
     var dt = lastFrameTime ? (now - lastFrameTime) / 1000 : 0.016;
     lastFrameTime = now;
     dt = Math.min(dt, 0.1); // clamp for tab-switch
 
-    lat = Math.max(-85, Math.min(85, lat));
+    // Apply momentum when not dragging
+    if (!isUserInteracting) {
+      var friction = Math.exp(-dt * 3);
+      velLon *= friction;
+      velLat *= friction;
+      if (Math.abs(velLon) < 0.0005) velLon = 0;
+      if (Math.abs(velLat) < 0.0005) velLat = 0;
+      targetLon -= velLon * dt * 60;
+      targetLat += velLat * dt * 60;
+    }
+
+    targetLat = Math.max(-85, Math.min(85, targetLat));
+
+    // Smooth interpolation towards target
+    var smoothF = 1 - Math.exp(-dt * 14);
+    displayLon += (targetLon - displayLon) * smoothF;
+    displayLat += (targetLat - displayLat) * smoothF;
+
+    lat = displayLat;
+    lon = displayLon;
+
+    // Smooth FOV
+    var fovDiff = targetFov - camera.fov;
+    if (Math.abs(fovDiff) > 0.01) {
+      camera.fov += fovDiff * (1 - Math.exp(-dt * 10));
+      camera.updateProjectionMatrix();
+    }
+
     var phi = THREE.MathUtils.degToRad(90 - lat);
     var theta = THREE.MathUtils.degToRad(lon);
     camera.lookAt(
@@ -751,7 +784,11 @@ export async function exportTourAsZip(
 
     const blob = await downloadImage(job.url)
     if (blob) {
-      zip.file(job.zipPath, blob)
+      // Store images without re-compression to preserve original quality
+      const isImage = /\.(jpe?g|png|webp|avif|gif)$/i.test(job.zipPath)
+      zip.file(job.zipPath, blob, {
+        compression: isImage ? 'STORE' : 'DEFLATE',
+      })
       job.apply(job.zipPath)
     }
     // If download fails, keep the original URL in tour.json
