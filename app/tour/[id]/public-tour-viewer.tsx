@@ -273,7 +273,7 @@ export default function PublicTourViewer({ tour, tourName }: PublicTourViewerPro
               <Compass className="h-8 w-8 text-primary mx-auto mb-3" />
               <h3 className="text-sm font-semibold text-card-foreground mb-1">Explore the Tour</h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Click and drag to look around. Click on hotspots to navigate between scenes or discover more information.
+                Drag or swipe to look around. Pinch to zoom. Tap on hotspots to navigate between scenes or discover more information.
               </p>
             </div>
           </div>
