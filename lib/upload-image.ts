@@ -5,10 +5,11 @@ const BUCKET = 'tour-images'
 /**
  * Upload a File to Supabase Storage under the current user's folder.
  * Returns the permanent public URL. Falls back to object URL if not authenticated.
+ * Supports images and PDF files.
  */
 export async function uploadTourImage(
   file: File,
-  folder: 'scenes' | 'hotspots' = 'scenes'
+  folder: 'scenes' | 'hotspots' | 'files' = 'scenes'
 ): Promise<string> {
   const supabase = createClient()
   if (!supabase) {
@@ -55,7 +56,7 @@ export function isBlobUrl(url: string): boolean {
  */
 export async function persistBlobUrl(
   blobUrl: string,
-  folder: 'scenes' | 'hotspots' = 'scenes'
+  folder: 'scenes' | 'hotspots' | 'files' = 'scenes'
 ): Promise<string> {
   if (!isBlobUrl(blobUrl)) return blobUrl
 

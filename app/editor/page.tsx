@@ -10,6 +10,8 @@ import {
   Upload,
   Compass,
   ArrowUpCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -72,6 +74,7 @@ function EditorPage() {
   const selectedHotspotId = useSelectedHotspotId()
   const [activePopup, setActivePopup] = useState<Hotspot | null>(null)
   const [sidebarTab, setSidebarTab] = useState('scenes')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [viewportDragOver, setViewportDragOver] = useState(false)
   const viewportFileInputRef = useRef<HTMLInputElement>(null)
   const searchParams = useSearchParams()
@@ -132,10 +135,14 @@ function EditorPage() {
             }
             const persistedHotspots = await Promise.all(
               scene.hotspots.map(async (h) => {
+                const updates: Partial<typeof h> = {}
                 if (h.imageUrl && isBlobUrl(h.imageUrl)) {
-                  return { ...h, imageUrl: await persistBlobUrl(h.imageUrl, 'hotspots') }
+                  updates.imageUrl = await persistBlobUrl(h.imageUrl, 'hotspots')
                 }
-                return h
+                if (h.pdfUrl && isBlobUrl(h.pdfUrl)) {
+                  updates.pdfUrl = await persistBlobUrl(h.pdfUrl, 'files')
+                }
+                return Object.keys(updates).length > 0 ? { ...h, ...updates } : h
               })
             )
             return { ...scene, imageUrl, hotspots: persistedHotspots }
@@ -284,9 +291,18 @@ function EditorPage() {
       <EditorToolbar saving={saving} lastSaved={lastSaved} onSaveNow={() => saveTour(tour)} />
 
       <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar toggle button (mobile) */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="absolute top-14 left-2 z-30 md:hidden h-9 w-9 rounded-lg bg-card/90 backdrop-blur-sm border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+        >
+          {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+        </button>
+
         {/* Left Sidebar */}
-        <div className="w-72 border-r border-border bg-card flex flex-col flex-shrink-0">
-          <Tabs value={sidebarTab} onValueChange={setSidebarTab} className="flex flex-col h-full">
+        <div className={`${sidebarOpen ? 'w-64 md:w-72' : 'w-0'} border-r border-border bg-card flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200`}>
+          <Tabs value={sidebarTab} onValueChange={setSidebarTab} className="flex flex-col h-full min-w-[16rem] md:min-w-[18rem]">
             <TabsList className="grid grid-cols-3 m-2 h-9">
               <TabsTrigger value="scenes" className="text-xs gap-1">
                 <Layers className="h-3.5 w-3.5" />
@@ -322,6 +338,7 @@ function EditorPage() {
                 fov={tour.settings.defaultFov}
                 autoRotate={tour.settings.autoRotate}
                 autoRotateSpeed={tour.settings.autoRotateSpeed}
+                iconSize={tour.settings.iconSize ?? 40}
                 onHotspotClick={handleHotspotClick}
                 onHotspotMoved={handleHotspotMoved}
                 onSceneClick={handleSceneClick}
@@ -350,12 +367,12 @@ function EditorPage() {
               {/* Floating bottom toolbar - add hotspot buttons */}
               {editorMode === 'view' && currentScene && (
                 <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20">
-                  <div className="flex items-center gap-1 bg-card/90 backdrop-blur-xl border border-border rounded-xl px-2 py-1.5 shadow-2xl">
+                  <div className="flex items-center gap-0.5 sm:gap-1 bg-card/90 backdrop-blur-xl border border-border rounded-xl px-1.5 sm:px-2 py-1 sm:py-1.5 shadow-2xl">
                     {targetScenes.length > 0 && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="gap-1.5 text-xs h-8 px-3"
+                        className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3"
                         onClick={() => { setAddHotspotType('scene-link'); setEditorMode('add-hotspot') }}
                       >
                         <ArrowUpCircle className="h-3.5 w-3.5" />
@@ -365,19 +382,19 @@ function EditorPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="gap-1.5 text-xs h-8 px-3"
+                      className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3"
                       onClick={() => { setAddHotspotType('info'); setEditorMode('add-hotspot') }}
                     >
-                      <MousePointerClick className="h-3.5 w-3.5" />
+                      <MousePointerClick className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       Info
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="gap-1.5 text-xs h-8 px-3"
+                      className="gap-1 sm:gap-1.5 text-[11px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3"
                       onClick={() => { setAddHotspotType('image'); setEditorMode('add-hotspot') }}
                     >
-                      <Upload className="h-3.5 w-3.5" />
+                      <Upload className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       Image
                     </Button>
                   </div>
