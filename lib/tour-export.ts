@@ -385,9 +385,8 @@ function generateStandaloneHTML(tour: Tour): string {
       }
       isUserInteracting = false;
       dragPointerId = -1;
-      // Apply momentum
-      velLon = -smoothVelLon;
-      velLat = smoothVelLat;
+      velLon = 0;
+      velLat = 0;
     }
   }
   function onWheel(e) {
@@ -626,19 +625,6 @@ function generateStandaloneHTML(tour: Tour): string {
     var dt = lastFrameTime ? (now - lastFrameTime) / 1000 : 0.016;
     lastFrameTime = now;
     dt = Math.min(dt, 0.1); // clamp for tab-switch
-
-    // Apply momentum when not dragging
-    if (!isUserInteracting) {
-      if (Math.abs(velLon) > 0.005 || Math.abs(velLat) > 0.005) {
-        lon += velLon;
-        lat += velLat;
-        var friction = Math.exp(-dt * 4);
-        velLon *= friction;
-        velLat *= friction;
-      } else {
-        velLon = 0; velLat = 0;
-      }
-    }
 
     lat = Math.max(-85, Math.min(85, lat));
     var phi = THREE.MathUtils.degToRad(90 - lat);

@@ -195,22 +195,6 @@ export default function PanoramaViewer({
         targetRotationRef.current.yaw += autoRotateSpeed * dt * 10
       }
 
-      // Apply momentum / inertia when finger is released
-      if (pointerState.current.mode === 'none' && !autoRotate) {
-        const vel = velocityRef.current
-        if (Math.abs(vel.yaw) > 0.005 || Math.abs(vel.pitch) > 0.005) {
-          targetRotationRef.current.yaw += vel.yaw
-          targetRotationRef.current.pitch += vel.pitch
-          // Gentle friction: decay velocity smoothly
-          const friction = Math.exp(-dt * 4)
-          vel.yaw *= friction
-          vel.pitch *= friction
-        } else {
-          vel.yaw = 0
-          vel.pitch = 0
-        }
-      }
-
       // Smooth camera interpolation - freeze during hotspot drag for stable raycast
       if (pointerState.current.mode !== 'hotspot') {
         // Smooth interpolation -- lower factor = more smoothing, less overshoot
@@ -535,13 +519,11 @@ export default function PanoramaViewer({
     }
 
     if (ps.mode === 'camera') {
-      // Apply smoothed velocity as momentum on release
-      velocityRef.current.yaw = smoothVelRef.current.yaw
-      velocityRef.current.pitch = smoothVelRef.current.pitch
+      // Stop camera immediately on release -- no momentum/drift
+      velocityRef.current = { yaw: 0, pitch: 0 }
+      smoothVelRef.current = { yaw: 0, pitch: 0 }
 
       if (!ps.moved) {
-        // This was a click/tap, not a drag
-        velocityRef.current = { yaw: 0, pitch: 0 }
         const target = e.target as HTMLElement
         const hotspotEl = target.closest('[data-hotspot-id]') as HTMLElement | null
         if (hotspotEl && onHotspotClick && !onHotspotMoved) {
