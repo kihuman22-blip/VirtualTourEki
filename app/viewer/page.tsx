@@ -503,7 +503,7 @@ function ViewerInstructions() {
         <Compass className="h-8 w-8 text-primary mx-auto mb-3" />
         <h3 className="text-sm font-semibold text-card-foreground mb-1">Explore the Tour</h3>
         <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-          Drag to look around. Click hotspots to navigate or view details. Scroll to zoom.
+          Drag or swipe to look around. Tap hotspots to navigate or view details. Pinch or scroll to zoom.
         </p>
         <Button size="sm" variant="secondary" className="text-xs" onClick={() => setVisible(false)}>
           Got it
