@@ -102,7 +102,8 @@ function EditorPage() {
         setDbLoaded(true)
       }
       loadFromDb()
-    } else if (!tourDbId && !tour) {
+    } else if (!tourDbId && !dbLoaded) {
+      // No ?id= param means "create new tour" -- always reset to a blank tour
       const blankTour = initTour('My Virtual Tour', 'An immersive 360 experience')
       loadTour(blankTour)
       setDbLoaded(true)
