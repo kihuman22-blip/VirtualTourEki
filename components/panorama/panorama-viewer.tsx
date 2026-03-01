@@ -205,7 +205,7 @@ export default function PanoramaViewer({
 
       // Apply momentum when not dragging
       if (pointerState.current.mode === 'none' && !autoRotate) {
-        const friction = Math.exp(-dt * 4) // smooth exponential decay
+        const friction = Math.exp(-dt * 6) // stronger friction for controlled deceleration
         velocityRef.current.yaw *= friction
         velocityRef.current.pitch *= friction
         // Kill tiny residual movement
@@ -217,8 +217,8 @@ export default function PanoramaViewer({
 
       // Smooth camera interpolation - freeze during hotspot drag for stable raycast
       if (pointerState.current.mode !== 'hotspot') {
-        // Smooth interpolation -- lower factor = more smoothing, silky feel
-        const smoothFactor = 1 - Math.exp(-dt * 12)
+        // Smooth interpolation -- lower factor = more smoothing, controlled feel
+        const smoothFactor = 1 - Math.exp(-dt * 8)
         rotationRef.current.yaw += (targetRotationRef.current.yaw - rotationRef.current.yaw) * smoothFactor
         rotationRef.current.pitch += (targetRotationRef.current.pitch - rotationRef.current.pitch) * smoothFactor
       } else {
@@ -482,8 +482,8 @@ export default function PanoramaViewer({
       // Scale sensitivity based on FOV
       const cam = cameraRef.current
       const fovScale = cam ? cam.fov / 75 : 1
-      // Balanced sensitivity for smooth, responsive movement
-      const sensitivity = 0.25 * fovScale
+      // Lower sensitivity for controlled, precise movement
+      const sensitivity = 0.15 * fovScale
 
       const deltaYaw = moveDx * sensitivity
       const deltaPitch = moveDy * sensitivity
@@ -495,7 +495,7 @@ export default function PanoramaViewer({
       // This prevents a single large delta from causing extreme momentum
       const velocityYaw = (deltaYaw / timeDelta) * 16 // normalize to ~60fps
       const velocityPitch = (deltaPitch / timeDelta) * 16
-      const alpha = 0.25 // smoothing factor -- lower = smoother momentum
+      const alpha = 0.2 // lower = smoother, more averaged momentum
       smoothVelRef.current.yaw = smoothVelRef.current.yaw * (1 - alpha) + velocityYaw * alpha
       smoothVelRef.current.pitch = smoothVelRef.current.pitch * (1 - alpha) + velocityPitch * alpha
     }
@@ -548,7 +548,7 @@ export default function PanoramaViewer({
 
     if (ps.mode === 'camera') {
       // Transfer smoothed velocity for momentum/inertia after release
-      const maxMomentum = 3.0 // cap maximum momentum
+      const maxMomentum = 1.5 // lower cap for controlled drift
       velocityRef.current = {
         yaw: Math.max(-maxMomentum, Math.min(maxMomentum, smoothVelRef.current.yaw)),
         pitch: Math.max(-maxMomentum, Math.min(maxMomentum, smoothVelRef.current.pitch)),
