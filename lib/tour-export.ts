@@ -81,8 +81,8 @@ function generateStandaloneHTML(tour: Tour): string {
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0a0a0a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; -webkit-tap-highlight-color: transparent; }
-  #viewer { width: 100vw; height: 100vh; height: 100dvh; position: relative; }
-  canvas { display: block; }
+  #viewer { width: 100vw; height: 100vh; height: 100dvh; position: relative; touch-action: none; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; touch-action: none; }
 
   .overlay { position: absolute; z-index: 10; pointer-events: none; }
   .overlay > * { pointer-events: auto; }
@@ -219,8 +219,7 @@ function generateStandaloneHTML(tour: Tour): string {
   var currentSceneId = null;
   var camera, scene, renderer, sphere;
   var isUserInteracting = false;
-  var lon = 0, lat = 0, onPointerDownLon = 0, onPointerDownLat = 0;
-  var onPointerDownX = 0, onPointerDownY = 0;
+  var lon = 0, lat = 0;
   var fov = 75;
   var tempVec = null;
 
@@ -291,28 +290,106 @@ function generateStandaloneHTML(tour: Tour): string {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.insertBefore(renderer.domElement, container.firstChild);
 
-    // Controls
+    // Controls -- touch + mouse with delta-based movement
     container.addEventListener('pointerdown', onPointerDown);
     container.addEventListener('pointermove', onPointerMove);
     container.addEventListener('pointerup', onPointerUp);
+    container.addEventListener('pointercancel', onPointerUp);
     container.addEventListener('wheel', onWheel, { passive: false });
+    // Prevent native scrolling / pull-to-refresh on mobile
+    container.addEventListener('touchmove', function(e) { if (e.cancelable) e.preventDefault(); }, { passive: false });
     window.addEventListener('resize', onResize);
   }
 
+  var dragPointerId = -1;
+  var lastX = 0, lastY = 0;
+  var velLon = 0, velLat = 0;
+  var smoothVelLon = 0, smoothVelLat = 0;
+  var pointers = {};
+  var pinchActive = false, pinchInitDist = 0, pinchInitFov = 75;
+
   function onPointerDown(e) {
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var numPointers = Object.keys(pointers).length;
+
     if (e.target.closest('.overlay, .hotspot-wrap, .popup-overlay, #popupContainer')) return;
-    isUserInteracting = true;
-    onPointerDownX = e.clientX;
-    onPointerDownY = e.clientY;
-    onPointerDownLon = lon;
-    onPointerDownLat = lat;
+
+    // Two-finger pinch
+    if (numPointers === 2) {
+      var pts = Object.values(pointers);
+      var dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      pinchActive = true;
+      pinchInitDist = dist;
+      pinchInitFov = fov;
+      velLon = 0; velLat = 0;
+      smoothVelLon = 0; smoothVelLat = 0;
+      return;
+    }
+
+    // Single finger / mouse drag
+    if (numPointers === 1) {
+      isUserInteracting = true;
+      dragPointerId = e.pointerId;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      velLon = 0; velLat = 0;
+      smoothVelLon = 0; smoothVelLat = 0;
+    }
   }
   function onPointerMove(e) {
-    if (!isUserInteracting) return;
-    lon = (onPointerDownX - e.clientX) * 0.15 + onPointerDownLon;
-    lat = (e.clientY - onPointerDownY) * 0.15 + onPointerDownLat;
+    if (pointers[e.pointerId]) {
+      pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    }
+    var numPointers = Object.keys(pointers).length;
+
+    // Pinch zoom
+    if (pinchActive && numPointers === 2) {
+      var pts = Object.values(pointers);
+      var dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      var scale = pinchInitDist / dist;
+      fov = Math.max(30, Math.min(100, pinchInitFov * scale));
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+      return;
+    }
+
+    if (!isUserInteracting || e.pointerId !== dragPointerId) return;
+
+    var dx = e.clientX - lastX;
+    var dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    var sens = 0.2 * (fov / 75);
+    lon -= dx * sens;
+    lat += dy * sens;
+
+    // Smooth velocity tracking for momentum
+    smoothVelLon = smoothVelLon * 0.7 + (dx * sens) * 0.3;
+    smoothVelLat = smoothVelLat * 0.7 + (dy * sens) * 0.3;
   }
-  function onPointerUp() { isUserInteracting = false; }
+  function onPointerUp(e) {
+    delete pointers[e.pointerId];
+    var numPointers = Object.keys(pointers).length;
+    if (numPointers < 2) pinchActive = false;
+
+    // If the primary drag pointer was released
+    if (e.pointerId === dragPointerId) {
+      // If one finger remains after pinch, continue dragging with it
+      if (numPointers === 1) {
+        var remainId = Object.keys(pointers)[0];
+        dragPointerId = parseInt(remainId);
+        lastX = pointers[remainId].x;
+        lastY = pointers[remainId].y;
+        return;
+      }
+      isUserInteracting = false;
+      dragPointerId = -1;
+      // Apply momentum
+      velLon = -smoothVelLon;
+      velLat = smoothVelLat;
+    }
+  }
   function onWheel(e) {
     e.preventDefault();
     fov = Math.max(30, Math.min(100, fov + e.deltaY * 0.05));
@@ -543,8 +620,26 @@ function generateStandaloneHTML(tour: Tour): string {
     return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  function animate() {
+  var lastFrameTime = 0;
+  function animate(now) {
     requestAnimationFrame(animate);
+    var dt = lastFrameTime ? (now - lastFrameTime) / 1000 : 0.016;
+    lastFrameTime = now;
+    dt = Math.min(dt, 0.1); // clamp for tab-switch
+
+    // Apply momentum when not dragging
+    if (!isUserInteracting) {
+      if (Math.abs(velLon) > 0.005 || Math.abs(velLat) > 0.005) {
+        lon += velLon;
+        lat += velLat;
+        var friction = Math.exp(-dt * 4);
+        velLon *= friction;
+        velLat *= friction;
+      } else {
+        velLon = 0; velLat = 0;
+      }
+    }
+
     lat = Math.max(-85, Math.min(85, lat));
     var phi = THREE.MathUtils.degToRad(90 - lat);
     var theta = THREE.MathUtils.degToRad(lon);
