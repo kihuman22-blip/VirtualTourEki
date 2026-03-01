@@ -109,7 +109,7 @@ export default function PanoramaViewer({
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     const isMobile = window.innerWidth < 768
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2))
+    renderer.setPixelRatio(window.devicePixelRatio)
     renderer.setSize(container.clientWidth, container.clientHeight)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     container.appendChild(renderer.domElement)
@@ -121,8 +121,8 @@ export default function PanoramaViewer({
     const s = new THREE.Scene()
     threeSceneRef.current = s
 
-    const geoSegments = isMobile ? 64 : 128
-    const geoRings = isMobile ? 40 : 80
+    const geoSegments = isMobile ? 96 : 200
+    const geoRings = isMobile ? 64 : 128
     const geo = new THREE.SphereGeometry(500, geoSegments, geoRings)
     geo.scale(-1, 1, 1)
     const mat = new THREE.MeshBasicMaterial({ color: 0x111111 })
@@ -205,20 +205,20 @@ export default function PanoramaViewer({
 
       // Apply momentum when not dragging
       if (pointerState.current.mode === 'none' && !autoRotate) {
-        const friction = Math.exp(-dt * 6) // stronger friction for controlled deceleration
+        const friction = Math.exp(-dt * 3) // gentle exponential decay for smooth coast
         velocityRef.current.yaw *= friction
         velocityRef.current.pitch *= friction
         // Kill tiny residual movement
-        if (Math.abs(velocityRef.current.yaw) < 0.001) velocityRef.current.yaw = 0
-        if (Math.abs(velocityRef.current.pitch) < 0.001) velocityRef.current.pitch = 0
+        if (Math.abs(velocityRef.current.yaw) < 0.0005) velocityRef.current.yaw = 0
+        if (Math.abs(velocityRef.current.pitch) < 0.0005) velocityRef.current.pitch = 0
         targetRotationRef.current.yaw += velocityRef.current.yaw * dt * 60
         targetRotationRef.current.pitch += velocityRef.current.pitch * dt * 60
       }
 
       // Smooth camera interpolation - freeze during hotspot drag for stable raycast
       if (pointerState.current.mode !== 'hotspot') {
-        // Smooth interpolation -- lower factor = more smoothing, controlled feel
-        const smoothFactor = 1 - Math.exp(-dt * 8)
+        // Very smooth interpolation -- lower = more smoothing
+        const smoothFactor = 1 - Math.exp(-dt * 14)
         rotationRef.current.yaw += (targetRotationRef.current.yaw - rotationRef.current.yaw) * smoothFactor
         rotationRef.current.pitch += (targetRotationRef.current.pitch - rotationRef.current.pitch) * smoothFactor
       } else {
@@ -483,7 +483,7 @@ export default function PanoramaViewer({
       const cam = cameraRef.current
       const fovScale = cam ? cam.fov / 75 : 1
       // Lower sensitivity for controlled, precise movement
-      const sensitivity = 0.15 * fovScale
+      const sensitivity = 0.18 * fovScale
 
       const deltaYaw = moveDx * sensitivity
       const deltaPitch = moveDy * sensitivity
@@ -495,7 +495,7 @@ export default function PanoramaViewer({
       // This prevents a single large delta from causing extreme momentum
       const velocityYaw = (deltaYaw / timeDelta) * 16 // normalize to ~60fps
       const velocityPitch = (deltaPitch / timeDelta) * 16
-      const alpha = 0.2 // lower = smoother, more averaged momentum
+      const alpha = 0.15 // very smooth momentum averaging
       smoothVelRef.current.yaw = smoothVelRef.current.yaw * (1 - alpha) + velocityYaw * alpha
       smoothVelRef.current.pitch = smoothVelRef.current.pitch * (1 - alpha) + velocityPitch * alpha
     }
@@ -548,7 +548,7 @@ export default function PanoramaViewer({
 
     if (ps.mode === 'camera') {
       // Transfer smoothed velocity for momentum/inertia after release
-      const maxMomentum = 1.5 // lower cap for controlled drift
+      const maxMomentum = 1.0 // gentle cap for smooth drift
       velocityRef.current = {
         yaw: Math.max(-maxMomentum, Math.min(maxMomentum, smoothVelRef.current.yaw)),
         pitch: Math.max(-maxMomentum, Math.min(maxMomentum, smoothVelRef.current.pitch)),
