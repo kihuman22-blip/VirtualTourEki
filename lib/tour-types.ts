@@ -11,6 +11,7 @@ export interface Hotspot {
   targetSceneId?: string
   description?: string
   imageUrl?: string
+  pdfUrl?: string
   content?: string
   icon?: 'arrow' | 'info' | 'image' | 'link' | 'eye' | 'utensils' | 'menu' | 'chef' | 'wine' | 'coffee' | 'star' | 'heart' | 'map-pin' | 'phone' | 'clock'
   color?: string
@@ -46,6 +47,7 @@ export interface TourSettings {
   controlType: 'orbit' | 'drag'
   showCompass: boolean
   backgroundColor: string
+  iconSize?: number
 }
 
 export const DEFAULT_TOUR_SETTINGS: TourSettings = {
@@ -58,6 +60,7 @@ export const DEFAULT_TOUR_SETTINGS: TourSettings = {
   controlType: 'drag',
   showCompass: true,
   backgroundColor: '#0a0a0a',
+  iconSize: 40,
 }
 
 export function createScene(

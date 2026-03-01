@@ -71,7 +71,9 @@ export default function HotspotPanel() {
   const editorMode = useEditorMode()
   const addHotspotType = useAddHotspotType()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadingPdf, setUploadingPdf] = useState(false)
 
   const handleImageUpload = async (file: File) => {
     if (!currentSceneId || !selectedHotspot) return
@@ -84,6 +86,20 @@ export default function HotspotPanel() {
       updateHotspot(currentSceneId, selectedHotspot.id, { imageUrl: url })
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handlePdfUpload = async (file: File) => {
+    if (!currentSceneId || !selectedHotspot) return
+    setUploadingPdf(true)
+    try {
+      const url = await uploadTourImage(file, 'files')
+      updateHotspot(currentSceneId, selectedHotspot.id, { pdfUrl: url })
+    } catch {
+      const url = URL.createObjectURL(file)
+      updateHotspot(currentSceneId, selectedHotspot.id, { pdfUrl: url })
+    } finally {
+      setUploadingPdf(false)
     }
   }
 
@@ -318,6 +334,65 @@ export default function HotspotPanel() {
                   className="mt-1 text-sm min-h-[100px] font-mono"
                   placeholder="<h3>Title</h3><p>Content here...</p>"
                 />
+              </div>
+            )}
+
+            {/* PDF upload (available for image and info types) */}
+            {(selectedHotspot.type === 'image' || selectedHotspot.type === 'info' || selectedHotspot.type === 'content') && (
+              <div>
+                <Label className="text-xs text-muted-foreground">PDF Attachment</Label>
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handlePdfUpload(file)
+                  }}
+                />
+
+                {selectedHotspot.pdfUrl ? (
+                  <div className="mt-1.5 space-y-2">
+                    <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-secondary/50">
+                      <FileText className="h-5 w-5 text-red-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">PDF attached</p>
+                        <a href={selectedHotspot.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline truncate block">
+                          Preview
+                        </a>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-7 px-2"
+                        onClick={() => pdfInputRef.current?.click()}
+                      >
+                        Replace
+                      </Button>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs w-full text-destructive hover:text-destructive"
+                      onClick={() => updateHotspot(currentSceneId, selectedHotspot.id, { pdfUrl: undefined })}
+                    >
+                      Remove PDF
+                    </Button>
+                  </div>
+                ) : (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => pdfInputRef.current?.click()}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pdfInputRef.current?.click() } }}
+                    className="mt-1.5 flex flex-col items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                  >
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">{uploadingPdf ? 'Uploading...' : 'Click to attach a PDF'}</span>
+                    <span className="text-[10px] text-muted-foreground/60">PDF files only</span>
+                  </div>
+                )}
               </div>
             )}
 
