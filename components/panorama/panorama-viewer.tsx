@@ -107,9 +107,15 @@ export default function PanoramaViewer({
     const container = canvasContainerRef.current
     if (!container) return
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     const isMobile = window.innerWidth < 768
-    renderer.setPixelRatio(window.devicePixelRatio)
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: !isMobile, // Disable antialiasing on mobile for better performance
+      alpha: true,
+      powerPreference: 'high-performance',
+      precision: 'highp'
+    })
+    // Use higher pixel ratio for sharper images (max 2 for performance balance)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.setSize(container.clientWidth, container.clientHeight)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     container.appendChild(renderer.domElement)
@@ -148,13 +154,26 @@ export default function PanoramaViewer({
 
     const img = new Image()
     img.crossOrigin = 'anonymous'
-    img.onload = () => {
+    // Set decode for better quality on high-res images
+    img.decoding = 'async'
+    img.onload = async () => {
+      // Wait for decode to complete for better quality
+      try {
+        await img.decode()
+      } catch {
+        // Fallback if decode fails
+      }
+      
       const tex = new THREE.Texture(img)
       tex.colorSpace = THREE.SRGBColorSpace
+      // Use higher quality filtering
       tex.minFilter = THREE.LinearMipmapLinearFilter
       tex.magFilter = THREE.LinearFilter
       tex.generateMipmaps = true
-      if (rendererRef.current) tex.anisotropy = rendererRef.current.capabilities.getMaxAnisotropy()
+      // Set maximum anisotropic filtering for sharper textures at angles
+      if (rendererRef.current) {
+        tex.anisotropy = rendererRef.current.capabilities.getMaxAnisotropy()
+      }
       tex.needsUpdate = true
 
       if (currentTextureRef.current) currentTextureRef.current.dispose()
@@ -631,8 +650,11 @@ export default function PanoramaViewer({
       {/* Three.js canvas */}
       <div ref={canvasContainerRef} className="absolute inset-0" style={{ touchAction: 'none' }} />
 
-      {/* Hotspot overlays */}
-      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
+      {/* Hotspot overlays - only show when panorama is loaded */}
+      <div 
+        className="absolute inset-0 pointer-events-none transition-opacity duration-300" 
+        style={{ zIndex: 10, opacity: isLoading ? 0 : 1 }}
+      >
         {scene.hotspots.map((hotspot) => {
           const isSelected = hotspot.id === selectedHotspotId
           const targetScene = allScenes?.find((s) => s.id === hotspot.targetSceneId)

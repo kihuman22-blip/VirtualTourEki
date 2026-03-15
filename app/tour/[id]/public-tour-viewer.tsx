@@ -46,6 +46,7 @@ export default function PublicTourViewer({ tour, tourName }: PublicTourViewerPro
   const [showShare, setShowShare] = useState(false)
   const [showSceneStrip, setShowSceneStrip] = useState(false)
   const [showInstructions, setShowInstructions] = useState(true)
+  const [isSceneLoaded, setIsSceneLoaded] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const currentScene = tour.scenes.find((s) => s.id === currentSceneId) || tour.scenes[0]
@@ -69,9 +70,19 @@ export default function PublicTourViewer({ tour, tourName }: PublicTourViewerPro
   }, [])
 
   const handleSceneChange = useCallback((sceneId: string) => {
+    setIsSceneLoaded(false) // Hide controls until new scene loads
     setCurrentSceneId(sceneId)
     setActivePopup(null)
   }, [])
+  
+  // Track when panorama finishes loading
+  useEffect(() => {
+    // Small delay to allow PanoramaViewer to start loading
+    const timer = setTimeout(() => {
+      setIsSceneLoaded(true)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [currentSceneId])
 
   const handleFullscreen = useCallback(() => {
     const el = containerRef.current
@@ -112,8 +123,10 @@ export default function PublicTourViewer({ tour, tourName }: PublicTourViewerPro
           allScenes={tour.scenes}
         />
 
-        {/* Top bar */}
-        <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 bg-gradient-to-b from-background/70 to-transparent pointer-events-none">
+        {/* Top bar - hidden until scene is loaded */}
+        <header 
+          className={`absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 bg-gradient-to-b from-background/70 to-transparent pointer-events-none transition-opacity duration-300 ${isSceneLoaded ? 'opacity-100' : 'opacity-0'}`}
+        >
           <div className="flex items-center gap-2 sm:gap-2.5 pointer-events-auto">
             <div className="flex items-center gap-1.5 sm:gap-2 bg-card/60 backdrop-blur-md border border-border/50 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5">
               <Compass className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
@@ -150,8 +163,8 @@ export default function PublicTourViewer({ tour, tourName }: PublicTourViewerPro
           </div>
         </header>
 
-        {/* Bottom bar */}
-        <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
+        {/* Bottom bar - hidden until scene is loaded */}
+        <div className={`absolute bottom-0 left-0 right-0 z-20 pointer-events-none transition-opacity duration-300 ${isSceneLoaded ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex items-end justify-between px-4 pb-4 bg-gradient-to-t from-background/70 via-background/30 to-transparent pt-16">
             <div className="pointer-events-auto">
               {prevScene ? (
