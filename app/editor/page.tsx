@@ -142,6 +142,18 @@ function EditorPage() {
                 if (h.pdfUrl && isBlobUrl(h.pdfUrl)) {
                   updates.pdfUrl = await persistBlobUrl(h.pdfUrl, 'files')
                 }
+                // Persist images array (multiple images for carousel)
+                if (h.images && h.images.length > 0) {
+                  const persistedImages = await Promise.all(
+                    h.images.map(async (imgUrl) => {
+                      if (isBlobUrl(imgUrl)) {
+                        return await persistBlobUrl(imgUrl, 'hotspots')
+                      }
+                      return imgUrl
+                    })
+                  )
+                  updates.images = persistedImages
+                }
                 return Object.keys(updates).length > 0 ? { ...h, ...updates } : h
               })
             )
@@ -178,7 +190,29 @@ function EditorPage() {
     [tourDbId, supabase]
   )
 
-  // No auto-save -- user must click "Save" manually
+  // Auto-save when tour changes (debounced 2 seconds)
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  useEffect(() => {
+    // Don't auto-save if not loaded from DB yet or if tour is empty
+    if (!dbLoaded || !tour || tour.scenes.length === 0) return
+    
+    // Clear any pending auto-save
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current)
+    }
+    
+    // Schedule auto-save after 2 seconds of no changes
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      saveTour(tour)
+    }, 2000)
+    
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+    }
+  }, [tour, dbLoaded, saveTour])
 
   const handleHotspotClick = useCallback(
     (hotspot: Hotspot) => {
