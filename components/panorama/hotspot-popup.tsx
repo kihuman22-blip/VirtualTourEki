@@ -150,9 +150,9 @@ export default function HotspotPopup({ hotspot, onClose, onNavigate }: HotspotPo
   }
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none p-2 sm:p-4">
+    <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none p-2 sm:p-4 overflow-y-auto">
       <div
-        className={`pointer-events-auto bg-[#1a1a1a] rounded-xl shadow-[0_8px_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200 relative transition-all ${getPopupClasses()}`}
+        className={`pointer-events-auto bg-[#1a1a1a] rounded-xl shadow-[0_8px_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200 relative transition-all my-auto ${getPopupClasses()}`}
       >
         {/* Top action buttons */}
         <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 flex items-center gap-1 sm:gap-1.5">
@@ -227,8 +227,8 @@ export default function HotspotPopup({ hotspot, onClose, onNavigate }: HotspotPo
           </div>
         )}
 
-        {/* Content */}
-        <div className="p-3 pr-12 sm:p-5 sm:pr-14 overflow-y-auto">
+        {/* Content - scrollable on mobile */}
+        <div className="p-3 pr-12 sm:p-5 sm:pr-14 overflow-y-auto overscroll-contain touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Icon + Title row */}
           <div className="flex items-center gap-2">
             <span className="flex-shrink-0 text-white/50">{getIcon()}</span>

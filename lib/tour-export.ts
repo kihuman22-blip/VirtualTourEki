@@ -147,7 +147,7 @@ function generateStandaloneHTML(tour: Tour): string {
   .popup-overlay {
     position: absolute; inset: 0; z-index: 20;
     display: flex; align-items: center; justify-content: center;
-    padding: 8px;
+    padding: 8px; overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   .popup {
     background: #1a1a1a; border-radius: 12px;
@@ -175,7 +175,7 @@ function generateStandaloneHTML(tour: Tour): string {
   .popup-img.landscape { max-height: 50vh; }
   .popup-img.square { max-height: 55vh; }
   .popup-pdf { width: 100%; height: 55vh; border: 0; flex-shrink: 0; background: #222; }
-  .popup-body { padding: 16px; padding-right: 44px; }
+  .popup-body { padding: 16px; padding-right: 44px; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
   .popup-body h3 { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
   .popup-body p { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
   .popup-body a { color: #60a5fa; text-decoration: underline; }
