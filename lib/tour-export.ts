@@ -278,8 +278,9 @@ function generateStandaloneHTML(tour: Tour): string {
     scene = new THREE.Scene();
     tempVec = new THREE.Vector3();
 
-    var segments = isMobile ? 96 : 200;
-    var rings = isMobile ? 64 : 128;
+    // Higher segment count for smoother sphere and maximum quality
+    var segments = isMobile ? 128 : 256;
+    var rings = isMobile ? 96 : 192;
     var geometry = new THREE.SphereGeometry(500, segments, rings);
     geometry.scale(-1, 1, 1);
     var material = new THREE.MeshBasicMaterial();
@@ -291,8 +292,8 @@ function generateStandaloneHTML(tour: Tour): string {
       powerPreference: 'high-performance',
       precision: 'highp'
     });
-    // Higher pixel ratio for sharper images (max 2 for performance balance)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Use full device pixel ratio for maximum sharpness
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.insertBefore(renderer.domElement, container.firstChild);

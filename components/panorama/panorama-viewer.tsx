@@ -114,8 +114,8 @@ export default function PanoramaViewer({
       powerPreference: 'high-performance',
       precision: 'highp'
     })
-    // Use higher pixel ratio for sharper images (max 2 for performance balance)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    // Use full device pixel ratio for maximum sharpness on high-DPI displays
+    renderer.setPixelRatio(window.devicePixelRatio)
     renderer.setSize(container.clientWidth, container.clientHeight)
     renderer.outputColorSpace = THREE.SRGBColorSpace
     container.appendChild(renderer.domElement)
@@ -127,8 +127,9 @@ export default function PanoramaViewer({
     const s = new THREE.Scene()
     threeSceneRef.current = s
 
-    const geoSegments = isMobile ? 96 : 200
-    const geoRings = isMobile ? 64 : 128
+    // Higher segment count = smoother sphere = better image quality
+    const geoSegments = isMobile ? 128 : 256
+    const geoRings = isMobile ? 96 : 192
     const geo = new THREE.SphereGeometry(500, geoSegments, geoRings)
     geo.scale(-1, 1, 1)
     const mat = new THREE.MeshBasicMaterial({ color: 0x111111 })
