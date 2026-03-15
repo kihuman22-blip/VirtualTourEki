@@ -297,8 +297,8 @@ export default function HotspotPanel() {
               />
             </div>
 
-            {/* Image Gallery upload (for image type) */}
-            {selectedHotspot.type === 'image' && (
+            {/* Image Gallery upload (for image and info types) */}
+            {(selectedHotspot.type === 'image' || selectedHotspot.type === 'info') && (
               <div>
                 <Label className="text-xs text-muted-foreground">Bilder (Karussell)</Label>
                 <input
