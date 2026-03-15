@@ -92,6 +92,7 @@ function generateStandaloneHTML(tour: Tour): string {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 16px;
     background: linear-gradient(to bottom, rgba(10,10,10,0.7), transparent);
+    transition: opacity 0.3s ease-out;
   }
   .tour-title {
     background: rgba(30,30,30,0.8); backdrop-filter: blur(12px);
@@ -105,6 +106,7 @@ function generateStandaloneHTML(tour: Tour): string {
     padding: 16px; gap: 8px;
     background: linear-gradient(to top, rgba(10,10,10,0.7), transparent);
     padding-top: 60px;
+    transition: opacity 0.3s ease-out;
   }
 
   .scene-btn {
@@ -208,7 +210,7 @@ function generateStandaloneHTML(tour: Tour): string {
     <div class="tour-title" id="tourTitle"></div>
   </div>
   <div class="overlay bottom-bar" id="sceneBar"></div>
-  <div id="hotspotLayer"></div>
+  <div id="hotspotLayer" style="transition: opacity 0.3s ease-out;"></div>
   <div id="popupContainer" class="hidden"></div>
 </div>
 
@@ -284,8 +286,13 @@ function generateStandaloneHTML(tour: Tour): string {
     sphere = new THREE.Mesh(geometry, material);
     scene.add(sphere);
 
-    renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer = new THREE.WebGLRenderer({ 
+      antialias: !isMobile,
+      powerPreference: 'high-performance',
+      precision: 'highp'
+    });
+    // Higher pixel ratio for sharper images (max 2 for performance balance)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.insertBefore(renderer.domElement, container.firstChild);
@@ -404,6 +411,8 @@ function generateStandaloneHTML(tour: Tour): string {
     renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
+  var sceneLoaded = false;
+  
   function loadScene(sceneId) {
     var sceneData = null;
     for (var i = 0; i < tourData.scenes.length; i++) {
@@ -411,6 +420,15 @@ function generateStandaloneHTML(tour: Tour): string {
     }
     if (!sceneData) return;
     currentSceneId = sceneId;
+    sceneLoaded = false;
+    
+    // Hide hotspots and UI until scene is loaded
+    var layer = document.getElementById('hotspotLayer');
+    var topBar = document.querySelector('.top-bar');
+    var bottomBar = document.querySelector('.bottom-bar');
+    if (layer) layer.style.opacity = '0';
+    if (topBar) topBar.style.opacity = '0';
+    if (bottomBar) bottomBar.style.opacity = '0';
 
     // Set initial view
     if (sceneData.initialViewDirection) {
@@ -420,17 +438,30 @@ function generateStandaloneHTML(tour: Tour): string {
       displayLon = lon; displayLat = lat;
     }
 
-    // Load texture
+    // Load texture with high quality settings
     var loader = new THREE.TextureLoader();
     loader.crossOrigin = 'anonymous';
     loader.load(sceneData.imageUrl, function(texture) {
       texture.colorSpace = THREE.SRGBColorSpace;
+      // High quality texture filtering
       texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = true;
+      // Maximum anisotropic filtering for sharper textures at angles
       texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
       sphere.material.map = texture;
       sphere.material.needsUpdate = true;
+      
+      // Show UI after texture is loaded
+      sceneLoaded = true;
+      setTimeout(function() {
+        var layer = document.getElementById('hotspotLayer');
+        var topBar = document.querySelector('.top-bar');
+        var bottomBar = document.querySelector('.bottom-bar');
+        if (layer) layer.style.opacity = '1';
+        if (topBar) topBar.style.opacity = '1';
+        if (bottomBar) bottomBar.style.opacity = '1';
+      }, 50);
     });
 
     // Update scene bar active state
