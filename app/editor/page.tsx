@@ -190,29 +190,7 @@ function EditorPage() {
     [tourDbId, supabase]
   )
 
-  // Auto-save when tour changes (debounced 2 seconds)
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
-  useEffect(() => {
-    // Don't auto-save if not loaded from DB yet or if tour is empty
-    if (!dbLoaded || !tour || tour.scenes.length === 0) return
-    
-    // Clear any pending auto-save
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-    }
-    
-    // Schedule auto-save after 2 seconds of no changes
-    autoSaveTimeoutRef.current = setTimeout(() => {
-      saveTour(tour)
-    }, 2000)
-    
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current)
-      }
-    }
-  }, [tour, dbLoaded, saveTour])
+  // No auto-save -- user must click "Save" manually
 
   const handleHotspotClick = useCallback(
     (hotspot: Hotspot) => {

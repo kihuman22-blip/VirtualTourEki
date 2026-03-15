@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -29,7 +29,6 @@ import {
   Pencil,
   Trash2,
   Copy,
-  Eye,
   LogOut,
   Layers,
   Globe,
@@ -38,8 +37,11 @@ import {
   ExternalLink,
   Check,
   Link2,
+  Upload,
+  Loader2,
 } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
+import { importTourFromZip } from '@/lib/tour-export'
 
 interface TourRow {
   id: string
@@ -125,6 +127,44 @@ export default function DashboardPage() {
   }
 
   const [copiedTourId, setCopiedTourId] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const zipInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImportZip = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !supabase || !user) return
+    
+    setImporting(true)
+    try {
+      const importedTour = await importTourFromZip(file)
+      if (!importedTour) {
+        alert('Ungultige ZIP-Datei. Bitte wahle eine exportierte Tour-Datei.')
+        return
+      }
+      
+      // Save to database and redirect to editor
+      const { data } = await supabase.from('tours').insert({
+        user_id: user.id,
+        name: importedTour.name || 'Imported Tour',
+        description: importedTour.description || null,
+        tour_data: importedTour as unknown as Record<string, unknown>,
+        is_public: false,
+        scene_count: importedTour.scenes.length,
+      }).select('id').single()
+      
+      if (data?.id) {
+        router.push(`/editor?id=${data.id}`)
+      }
+    } catch (err) {
+      console.error('Import error:', err)
+      alert('Fehler beim Importieren der Tour.')
+    } finally {
+      setImporting(false)
+      if (zipInputRef.current) {
+        zipInputRef.current.value = ''
+      }
+    }
+  }
 
   const handleCopyShareLink = async (tourId: string) => {
     const url = `${window.location.origin}/tour/${tourId}`
@@ -157,6 +197,29 @@ export default function DashboardPage() {
           </Link>
 
           <div className="flex items-center gap-4">
+            {/* Hidden file input for ZIP import */}
+            <input
+              ref={zipInputRef}
+              type="file"
+              accept=".zip"
+              onChange={handleImportZip}
+              className="hidden"
+            />
+            
+            <Button 
+              variant="outline" 
+              onClick={() => zipInputRef.current?.click()}
+              disabled={importing}
+              className="gap-2"
+            >
+              {importing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              {importing ? 'Importieren...' : 'Import ZIP'}
+            </Button>
+            
             <Button onClick={handleNewTour} className="gap-2">
               <Plus className="h-4 w-4" />
               New Tour
