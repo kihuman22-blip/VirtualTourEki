@@ -180,12 +180,12 @@ export default function HotspotPopup({ hotspot, onClose, onNavigate }: HotspotPo
 
         {/* Image -- adaptive sizing, no black borders */}
         {hasImage && (
-          <div className={`relative w-full overflow-hidden bg-black flex-shrink-0 flex items-center justify-center ${expanded ? 'max-h-[65vh]' : ''}`}>
+          <div className={`relative w-full overflow-hidden flex-shrink-0 flex items-center justify-center ${expanded ? 'max-h-[65vh]' : ''}`}>
             <img
               ref={imgRef}
               src={currentImageUrl}
               alt={hotspot.title}
-              className={`w-full h-auto object-contain ${expanded ? 'max-h-[65vh]' : imageOrientation === 'portrait' ? 'max-h-[60vh]' : imageOrientation === 'landscape' ? 'max-h-[50vh]' : 'max-h-[55vh]'}`}
+              className={`w-full h-auto object-cover rounded-t-xl ${expanded ? 'max-h-[65vh]' : imageOrientation === 'portrait' ? 'max-h-[60vh]' : imageOrientation === 'landscape' ? 'max-h-[50vh]' : 'max-h-[55vh]'}`}
               crossOrigin="anonymous"
             />
             

@@ -170,7 +170,7 @@ function generateStandaloneHTML(tour: Tour): string {
     font-size: 18px;
   }
   .popup-close:hover { color: #fff; background: rgba(0,0,0,0.6); }
-  .popup-img { width: 100%; height: auto; object-fit: contain; background: #000; display: block; }
+  .popup-img { width: 100%; height: auto; object-fit: cover; border-radius: 12px 12px 0 0; display: block; }
   .popup-img.portrait { max-height: 60vh; }
   .popup-img.landscape { max-height: 50vh; }
   .popup-img.square { max-height: 55vh; }
@@ -183,7 +183,7 @@ function generateStandaloneHTML(tour: Tour): string {
   .popup-pdf-link:hover { color: #93bbfd; }
   
   /* Image carousel */
-  .popup-img-container { position: relative; width: 100%; background: #000; }
+  .popup-img-container { position: relative; width: 100%; }
   .popup-carousel-btn {
     position: absolute; top: 50%; transform: translateY(-50%);
     width: 40px; height: 40px; border-radius: 50%;
