@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
-import { X, ArrowRight, Info, ImageIcon, FileText, Eye, Link as LinkIcon, Share2, Maximize2, Minimize2, Check, FileDown } from 'lucide-react'
+import { X, ArrowRight, Info, ImageIcon, FileText, Eye, Link as LinkIcon, Share2, Maximize2, Minimize2, Check, FileDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Hotspot } from '@/lib/tour-types'
 
@@ -39,11 +39,21 @@ export default function HotspotPopup({ hotspot, onClose, onNavigate }: HotspotPo
   const [copied, setCopied] = useState(false)
   const [imageOrientation, setImageOrientation] = useState<'portrait' | 'landscape' | 'square'>('landscape')
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const imgRef = useRef<HTMLImageElement>(null)
+  
+  // Get all images (from images array or single imageUrl for backwards compatibility)
+  const allImages = hotspot.images && hotspot.images.length > 0 
+    ? hotspot.images 
+    : hotspot.imageUrl 
+      ? [hotspot.imageUrl] 
+      : []
+  const hasMultipleImages = allImages.length > 1
+  const currentImageUrl = allImages[currentImageIndex] || ''
 
   // Detect image orientation on load
   useEffect(() => {
-    if (hotspot.type === 'image' && hotspot.imageUrl) {
+    if (hotspot.type === 'image' && currentImageUrl) {
       setImageLoaded(false)
       const img = new window.Image()
       img.crossOrigin = 'anonymous'
@@ -59,9 +69,24 @@ export default function HotspotPopup({ hotspot, onClose, onNavigate }: HotspotPo
         setImageLoaded(true)
       }
       img.onerror = () => setImageLoaded(true)
-      img.src = hotspot.imageUrl
+      img.src = currentImageUrl
     }
-  }, [hotspot.type, hotspot.imageUrl])
+  }, [hotspot.type, currentImageUrl])
+  
+  // Reset image index when hotspot changes
+  useEffect(() => {
+    setCurrentImageIndex(0)
+  }, [hotspot.id])
+  
+  const goToPrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1))
+  }
+  
+  const goToNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCurrentImageIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0))
+  }
 
   const getIcon = () => {
     switch (hotspot.icon) {
@@ -101,7 +126,7 @@ export default function HotspotPopup({ hotspot, onClose, onNavigate }: HotspotPo
   }
 
   const hasPdf = !!hotspot.pdfUrl
-  const hasImage = hotspot.type === 'image' && !!hotspot.imageUrl
+  const hasImage = hotspot.type === 'image' && allImages.length > 0
 
   // Adaptive popup sizing based on image orientation
   const getPopupClasses = () => {
