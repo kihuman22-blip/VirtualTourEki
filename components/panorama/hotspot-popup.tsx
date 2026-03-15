@@ -53,7 +53,7 @@ export default function HotspotPopup({ hotspot, onClose, onNavigate }: HotspotPo
 
   // Detect image orientation on load
   useEffect(() => {
-    if (hotspot.type === 'image' && currentImageUrl) {
+    if ((hotspot.type === 'image' || hotspot.type === 'info') && currentImageUrl) {
       setImageLoaded(false)
       const img = new window.Image()
       img.crossOrigin = 'anonymous'
@@ -126,7 +126,7 @@ export default function HotspotPopup({ hotspot, onClose, onNavigate }: HotspotPo
   }
 
   const hasPdf = !!hotspot.pdfUrl
-  const hasImage = hotspot.type === 'image' && allImages.length > 0
+  const hasImage = (hotspot.type === 'image' || hotspot.type === 'info') && allImages.length > 0
 
   // Adaptive popup sizing based on image orientation
   const getPopupClasses = () => {
@@ -180,14 +180,39 @@ export default function HotspotPopup({ hotspot, onClose, onNavigate }: HotspotPo
 
         {/* Image -- adaptive sizing, no black borders */}
         {hasImage && (
-          <div className={`w-full overflow-hidden bg-black flex-shrink-0 flex items-center justify-center ${expanded ? 'max-h-[65vh]' : ''}`}>
+          <div className={`relative w-full overflow-hidden bg-black flex-shrink-0 flex items-center justify-center ${expanded ? 'max-h-[65vh]' : ''}`}>
             <img
               ref={imgRef}
-              src={hotspot.imageUrl}
+              src={currentImageUrl}
               alt={hotspot.title}
               className={`w-full h-auto object-contain ${expanded ? 'max-h-[65vh]' : imageOrientation === 'portrait' ? 'max-h-[60vh]' : imageOrientation === 'landscape' ? 'max-h-[50vh]' : 'max-h-[55vh]'}`}
               crossOrigin="anonymous"
             />
+            
+            {/* Navigation arrows for multiple images */}
+            {hasMultipleImages && (
+              <>
+                <button
+                  onClick={goToPrevImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition-colors"
+                  title="Vorheriges Bild"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button
+                  onClick={goToNextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition-colors"
+                  title="Nächstes Bild"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+                
+                {/* Image counter */}
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 text-white/90 text-xs font-medium">
+                  {currentImageIndex + 1} / {allImages.length}
+                </div>
+              </>
+            )}
           </div>
         )}
 
