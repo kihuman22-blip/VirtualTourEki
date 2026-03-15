@@ -181,6 +181,28 @@ function generateStandaloneHTML(tour: Tour): string {
   .popup-body a { color: #60a5fa; text-decoration: underline; }
   .popup-pdf-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: #60a5fa; text-decoration: none; }
   .popup-pdf-link:hover { color: #93bbfd; }
+  
+  /* Image carousel */
+  .popup-img-container { position: relative; width: 100%; background: #000; }
+  .popup-carousel-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+    border: none; color: rgba(255,255,255,0.8); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, color 0.2s;
+  }
+  .popup-carousel-btn:hover { background: rgba(0,0,0,0.7); color: #fff; }
+  .popup-carousel-btn.prev { left: 8px; }
+  .popup-carousel-btn.next { right: 8px; }
+  .popup-carousel-btn svg { width: 24px; height: 24px; }
+  .popup-img-counter {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+    padding: 4px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.9);
+  }
+  
   .popup-nav-btn {
     display: block; width: 100%; margin-top: 16px; padding: 10px;
     background: #fff; color: #000; border: none; border-radius: 8px;
@@ -577,6 +599,9 @@ function generateStandaloneHTML(tour: Tour): string {
     return text.replace(/(https?:\\/\\/[^\\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
   }
 
+  var currentPopupImages = [];
+  var currentPopupImageIndex = 0;
+
   function showPopup(hs) {
     var container = document.getElementById('popupContainer');
     container.className = 'popup-overlay';
@@ -585,7 +610,20 @@ function generateStandaloneHTML(tour: Tour): string {
     var popupClass = 'popup default-popup';
     var imgClass = '';
     var hasPdf = hs.pdfUrl && hs.pdfUrl.length > 0;
-    var hasImage = hs.type === 'image' && hs.imageUrl;
+    
+    // Collect all images (images array + imageUrl fallback)
+    var allImages = [];
+    if (hs.images && hs.images.length > 0) {
+      allImages = hs.images.slice();
+    }
+    if (hs.imageUrl && allImages.indexOf(hs.imageUrl) === -1) {
+      allImages.unshift(hs.imageUrl);
+    }
+    var hasImage = (hs.type === 'image' || hs.type === 'info') && allImages.length > 0;
+    var hasMultipleImages = allImages.length > 1;
+    
+    currentPopupImages = allImages;
+    currentPopupImageIndex = 0;
 
     if (hasPdf) {
       popupClass = 'popup pdf-popup';
@@ -595,8 +633,16 @@ function generateStandaloneHTML(tour: Tour): string {
     html += '<button class="popup-close" onclick="document.getElementById(\\'popupContainer\\').className=\\'hidden\\'">&times;</button>';
 
     if (hasImage) {
-      // Detect orientation via preloaded image
-      html += '<img class="popup-img" id="popupImg" src="' + escapeAttr(hs.imageUrl) + '" alt="' + escapeAttr(hs.title) + '" onload="adaptPopup(this)">';
+      html += '<div class="popup-img-container">';
+      html += '<img class="popup-img" id="popupImg" src="' + escapeAttr(allImages[0]) + '" alt="' + escapeAttr(hs.title) + '" onload="adaptPopup(this)">';
+      
+      if (hasMultipleImages) {
+        html += '<button class="popup-carousel-btn prev" onclick="window.__prevImage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>';
+        html += '<button class="popup-carousel-btn next" onclick="window.__nextImage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>';
+        html += '<div class="popup-img-counter" id="imgCounter">1 / ' + allImages.length + '</div>';
+      }
+      
+      html += '</div>';
     }
 
     if (hasPdf) {
@@ -646,6 +692,29 @@ function generateStandaloneHTML(tour: Tour): string {
   }
 
   window.__loadScene = function(id) { loadScene(id); };
+  
+  window.__prevImage = function() {
+    if (currentPopupImages.length <= 1) return;
+    currentPopupImageIndex = (currentPopupImageIndex - 1 + currentPopupImages.length) % currentPopupImages.length;
+    updateCarouselImage();
+  };
+  
+  window.__nextImage = function() {
+    if (currentPopupImages.length <= 1) return;
+    currentPopupImageIndex = (currentPopupImageIndex + 1) % currentPopupImages.length;
+    updateCarouselImage();
+  };
+  
+  function updateCarouselImage() {
+    var img = document.getElementById('popupImg');
+    var counter = document.getElementById('imgCounter');
+    if (img) {
+      img.src = currentPopupImages[currentPopupImageIndex];
+    }
+    if (counter) {
+      counter.textContent = (currentPopupImageIndex + 1) + ' / ' + currentPopupImages.length;
+    }
+  }
 
   function escapeHTML(str) {
     var div = document.createElement('div');
@@ -783,6 +852,7 @@ export async function exportTourAsZip(
     })
 
     scene.hotspots.forEach((hs, j) => {
+      // Export single imageUrl
       if (hs.imageUrl) {
         const hsExt = getExtension(hs.imageUrl)
         const hsPath = `images/hotspots/${sceneName}-hs-${j}.${hsExt}`
@@ -792,6 +862,22 @@ export async function exportTourAsZip(
           apply: (path) => { hs.imageUrl = path },
         })
       }
+      
+      // Export images array (multiple images for carousel)
+      if (hs.images && hs.images.length > 0) {
+        hs.images.forEach((imgUrl, imgIndex) => {
+          const imgExt = getExtension(imgUrl)
+          const imgPath = `images/hotspots/${sceneName}-hs-${j}-img-${imgIndex}.${imgExt}`
+          fileJobs.push({
+            url: imgUrl,
+            zipPath: imgPath,
+            apply: (path) => { 
+              if (hs.images) hs.images[imgIndex] = path 
+            },
+          })
+        })
+      }
+      
       if (hs.pdfUrl) {
         const pdfPath = `files/${sceneName}-hs-${j}.pdf`
         fileJobs.push({
@@ -895,6 +981,18 @@ export async function importTourFromZip(file: File): Promise<Tour | null> {
             hs.imageUrl = URL.createObjectURL(blob)
           }
         }
+        
+        // Import images array (multiple images for carousel)
+        if (hs.images && hs.images.length > 0) {
+          for (let imgIndex = 0; imgIndex < hs.images.length; imgIndex++) {
+            const imgFile = zip.file(hs.images[imgIndex])
+            if (imgFile) {
+              const blob = await imgFile.async('blob')
+              hs.images[imgIndex] = URL.createObjectURL(blob)
+            }
+          }
+        }
+        
         if (hs.pdfUrl) {
           const pdfFile = zip.file(hs.pdfUrl)
           if (pdfFile) {
