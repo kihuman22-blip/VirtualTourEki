@@ -11,6 +11,7 @@ export interface Hotspot {
   targetSceneId?: string
   description?: string
   imageUrl?: string
+  images?: string[] // Multiple images for carousel
   pdfUrl?: string
   content?: string
   icon?: 'arrow' | 'info' | 'image' | 'link' | 'eye' | 'utensils' | 'menu' | 'chef' | 'wine' | 'coffee' | 'star' | 'heart' | 'map-pin' | 'phone' | 'clock'

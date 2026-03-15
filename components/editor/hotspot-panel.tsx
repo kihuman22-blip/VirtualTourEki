@@ -10,6 +10,9 @@ import {
   Navigation,
   MousePointerClick,
   Upload,
+  X,
+  Plus,
+  GripVertical,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -75,17 +78,48 @@ export default function HotspotPanel() {
   const [uploading, setUploading] = useState(false)
   const [uploadingPdf, setUploadingPdf] = useState(false)
 
-  const handleImageUpload = async (file: File) => {
+  const handleImageUpload = async (file: File, addToCarousel: boolean = false) => {
     if (!currentSceneId || !selectedHotspot) return
     setUploading(true)
     try {
       const url = await uploadTourImage(file, 'hotspots')
-      updateHotspot(currentSceneId, selectedHotspot.id, { imageUrl: url })
+      if (addToCarousel) {
+        const currentImages = selectedHotspot.images || []
+        updateHotspot(currentSceneId, selectedHotspot.id, { images: [...currentImages, url] })
+      } else {
+        updateHotspot(currentSceneId, selectedHotspot.id, { imageUrl: url })
+      }
     } catch {
       const url = URL.createObjectURL(file)
-      updateHotspot(currentSceneId, selectedHotspot.id, { imageUrl: url })
+      if (addToCarousel) {
+        const currentImages = selectedHotspot.images || []
+        updateHotspot(currentSceneId, selectedHotspot.id, { images: [...currentImages, url] })
+      } else {
+        updateHotspot(currentSceneId, selectedHotspot.id, { imageUrl: url })
+      }
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleRemoveCarouselImage = (index: number) => {
+    if (!currentSceneId || !selectedHotspot) return
+    const currentImages = selectedHotspot.images || []
+    const newImages = currentImages.filter((_, i) => i !== index)
+    updateHotspot(currentSceneId, selectedHotspot.id, { images: newImages })
+  }
+
+  const handleMoveImage = (index: number, direction: 'up' | 'down') => {
+    if (!currentSceneId || !selectedHotspot) return
+    const currentImages = selectedHotspot.images || []
+    if (direction === 'up' && index > 0) {
+      const newImages = [...currentImages]
+      ;[newImages[index - 1], newImages[index]] = [newImages[index], newImages[index - 1]]
+      updateHotspot(currentSceneId, selectedHotspot.id, { images: newImages })
+    } else if (direction === 'down' && index < currentImages.length - 1) {
+      const newImages = [...currentImages]
+      ;[newImages[index], newImages[index + 1]] = [newImages[index + 1], newImages[index]]
+      updateHotspot(currentSceneId, selectedHotspot.id, { images: newImages })
     }
   }
 
@@ -263,47 +297,78 @@ export default function HotspotPanel() {
               />
             </div>
 
-            {/* Image upload (for image type) */}
+            {/* Image Gallery upload (for image type) */}
             {selectedHotspot.type === 'image' && (
               <div>
-                <Label className="text-xs text-muted-foreground">Image</Label>
+                <Label className="text-xs text-muted-foreground">Bilder (Karussell)</Label>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleImageUpload(file)
+                    const files = e.target.files
+                    if (files) {
+                      Array.from(files).forEach(file => handleImageUpload(file, true))
+                    }
+                    e.target.value = '' // Reset input
                   }}
                 />
 
-                {selectedHotspot.imageUrl ? (
+                {/* Image list */}
+                {(selectedHotspot.images && selectedHotspot.images.length > 0) ? (
                   <div className="mt-1.5 space-y-2">
-                    <div className="relative rounded-lg overflow-hidden border border-border">
-                      <img
-                        src={selectedHotspot.imageUrl}
-                        alt="Hotspot image"
-                        className="w-full h-32 object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/0 hover:bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-all">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="text-xs"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          Replace
-                        </Button>
-                      </div>
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {selectedHotspot.images.map((imgUrl, index) => (
+                        <div key={index} className="relative flex items-center gap-2 p-1.5 rounded-lg border border-border bg-secondary/30">
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(index, 'up')}
+                              disabled={index === 0}
+                              className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(index, 'down')}
+                              disabled={index === (selectedHotspot.images?.length || 0) - 1}
+                              className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                            </button>
+                          </div>
+                          <img
+                            src={imgUrl}
+                            alt={`Bild ${index + 1}`}
+                            className="w-16 h-12 object-cover rounded"
+                          />
+                          <span className="flex-1 text-xs text-muted-foreground truncate">
+                            Bild {index + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCarouselImage(index)}
+                            className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
+                    
+                    {/* Add more images button */}
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="text-xs w-full text-destructive hover:text-destructive"
-                      onClick={() => updateHotspot(currentSceneId, selectedHotspot.id, { imageUrl: undefined })}
+                      className="w-full text-xs"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
                     >
-                      Remove Image
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
+                      {uploading ? 'Hochladen...' : 'Weitere Bilder hinzufugen'}
                     </Button>
                   </div>
                 ) : (
@@ -315,8 +380,8 @@ export default function HotspotPanel() {
                     className="mt-1.5 flex flex-col items-center justify-center gap-2 p-6 rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer"
                   >
                     <Upload className="h-6 w-6 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{uploading ? 'Uploading...' : 'Click to upload an image'}</span>
-                    <span className="text-[10px] text-muted-foreground/60">JPG, PNG, WebP</span>
+                    <span className="text-xs text-muted-foreground">{uploading ? 'Hochladen...' : 'Klicken zum Hochladen'}</span>
+                    <span className="text-[10px] text-muted-foreground/60">JPG, PNG, WebP - Mehrere Bilder erlaubt</span>
                   </div>
                 )}
               </div>
